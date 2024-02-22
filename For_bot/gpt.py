@@ -3,6 +3,7 @@ from telebot import types
 import config
 import nou
 import json
+from transformers import AutoTokenizer
 
 bot = telebot.TeleBot(token=config.token)
 answer = ''
@@ -12,6 +13,9 @@ max_tokens_in_task = 2048
 with open('user.json', 'w+') as file:
     json.dump(user, file)
 
+def count_tokens(text):
+    tokenizer = AutoTokenizer.from_pretrained("rhysjones/phi-2-orange")  # название модели
+    return len(tokenizer.encode(text))
 
 @bot.message_handler(commands=['debug'])
 def send_logs(message):
@@ -78,10 +82,10 @@ def get_promtss(message):
     user[user_id]['user_promt'] = message.text
     with open('user.json', 'w+') as file:
         json.dump(user, file)
-#    if message.text > max_tokens_in_task:
-#        bot.send_message(chat_id=message.chat.id, text="Сообщение слишком большое! Напиши вопрос короче")
-#        bot.register_next_step_handler_by_chat_id(message, get_promtss)
-#        return
+    if count_tokens(message.text) > max_tokens_in_task:
+        bot.send_message(chat_id=message.chat.id, text="Сообщение слишком большое! Напиши вопрос короче")
+        bot.register_next_step_handler_by_chat_id(message, get_promtss)
+        return
     bot.send_message(chat_id=message.chat.id, text="Промт принят!")
     bot.register_next_step_handler_by_chat_id(user_id, nou.answer_function)
     # дальше идет обработка промта и отправка результата
