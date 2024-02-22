@@ -1,4 +1,4 @@
-import main
+import config
 import telebot
 from telebot import types
 import requests
@@ -14,7 +14,7 @@ logging.basicConfig(
     filemode="w",
 )
 
-bot = telebot.TeleBot(token=main.token)
+bot = telebot.TeleBot(token=config.token)
 
 system_content = 'Ты - дружелюбный помощник! Давай подробный ответ на русском языке.'
 task = ''
@@ -30,7 +30,7 @@ except:
     user = {}
 
 # обработка действий для состояния "Получение ответа"
-def get_promt(message):
+def get_promtss(message):
     user_name = message.from_user.id
     # убеждаемся, что получили текстовое сообщение, а не что-то другое
     if message.content_type != "text":
@@ -58,7 +58,7 @@ def answer_function(call):
     user_name = call.from_user.first_name
     try:
         resp = requests.post(
-            'http://localhost:1234/v1/chat/completions',            #ПОМЕНЯТЬ
+            'http://158.160.135.104:1234/v1/chat/completions',            #ПОМЕНЯТЬ
             headers={"Content-Type": "application/json"},
 
             json={
@@ -82,12 +82,13 @@ def answer_function(call):
         bot.send_message(call.message.chat.id, text=result, reply_markup=keyboard)
 
         if call.data != 'button2':
-            user[user_name][user_promt] = ''
-            global user
-            user[user_name][answer] = ''
+            user[user_name]['user_promt'] = ''
+            user[user_name]['answer'] = ''
+            with open('user.json', 'w+') as file:
+                json.dump(user, file)
             bot.register_next_step_handler(call, gpt.solve_task)
         else:
-            answer += result
+            user[user_name]['answer'] += result
             return
     except:
         logging.error(

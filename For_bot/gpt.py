@@ -1,10 +1,10 @@
 import telebot
 from telebot import types
-import main
-import bot
+import config
+import botik
 import json
 
-bot = telebot.TeleBot(token=main.token)
+bot = telebot.TeleBot(token=config.token)
 answer = ''
 user = {}
 
@@ -33,19 +33,22 @@ def help_function(message):
 def start_function(message):
     user_name = message.from_user.first_name
     if user_name in user:
-         bot.send_message(message.from_user.id, text=f"Приветствую тебя снова, {user_name}!")
-    else:
         bot.send_message(message.from_user.id, text=f"Приветствую тебя снова, {user_name}!")
-        user[user_name] = ''
-        user[user_name]['answer'] = ''
+        bot.register_next_step_handler(message, solve_task)
+    else:
+        bot.send_message(message.from_user.id, text=f"Приветствую тебя, {user_name}!")
+        user[user_name] = {}
         user[user_name]['user_promt'] = ''
+        user[user_name]['answer'] = ''
         with open('user.json', 'w+') as file:
             json.dump(user, file)
-    bot.register_next_step_handler(message, solve_task)
+        bot.register_next_step_handler(message, solve_task)
 
 @bot.message_handler(commands=['solve_task'])
 def solve_task(message):
     user_id = message.from_user.id
     bot.send_message(user_id, text="Следующим сообщением напиши вопрос")
     # регистрируем следующий "шаг"
-    bot.register_next_step_handler(message, bot.get_promt)
+    bot.register_next_step_handler(user_id, botik.get_promtss)
+
+bot.polling()
