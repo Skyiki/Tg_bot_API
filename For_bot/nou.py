@@ -29,26 +29,6 @@ try:
 except:
     user = {}
 
-# обработка действий для состояния "Получение ответа"
-def get_promtss(message):
-    user_id = message.chat.id
-    # убеждаемся, что получили текстовое сообщение, а не что-то другое
-    if message.content_type != "text":
-        bot.send_message(chat_id=message.chat.id, text="Отправь ответ текстовым сообщением")
-        # регистрируем следующий "шаг" на эту же функцию
-        bot.register_next_step_handler(message, get_promtss)
-        return
-    # получаем сообщение, которое и будет промтом
-
-    user[user_id]['user_promt'] = message.text
-    with open('user.json', 'w+') as file:
-        json.dump(user, file)
-    if message.text > max_tokens_in_task:
-        bot.send_message(chat_id=message.chat.id, text="Сообщение слишком большое! Напиши вопрос короче")
-        bot.register_next_step_handler(message, get_promtss)
-        return
-    bot.send_message(chat_id=message.chat.id, text="Промт принят!")
-    # дальше идет обработка промта и отправка результата
 
 @bot.message_handler(commands=['answer'])
 def answer_function(call):
