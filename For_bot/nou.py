@@ -31,72 +31,68 @@ except:
 
 # обработка действий для состояния "Получение ответа"
 def get_promtss(message):
-    user_name = message.from_user.id
+    user_id = message.chat.id
     # убеждаемся, что получили текстовое сообщение, а не что-то другое
     if message.content_type != "text":
         bot.send_message(chat_id=message.chat.id, text="Отправь ответ текстовым сообщением")
         # регистрируем следующий "шаг" на эту же функцию
-        bot.register_next_step_handler(message, get_promt)
+        bot.register_next_step_handler(message, get_promtss)
         return
     # получаем сообщение, которое и будет промтом
-    global user_promt
-    user_promt = message.text
-    user[user_name]['user_promt'] = user_promt
 
-    user[user_name] = user_promt
+    user[user_id]['user_promt'] = message.text
+    with open('user.json', 'w+') as file:
+        json.dump(user, file)
     if message.text > max_tokens_in_task:
         bot.send_message(chat_id=message.chat.id, text="Сообщение слишком большое! Напиши вопрос короче")
-        bot.register_next_step_handler(message, get_promt)
+        bot.register_next_step_handler(message, get_promtss)
         return
     bot.send_message(chat_id=message.chat.id, text="Промт принят!")
     # дальше идет обработка промта и отправка результата
 
 @bot.message_handler(commands=['answer'])
 def answer_function(call):
-    answer = ''
-    global result
-    user_name = call.from_user.first_name
+    user_id = call.message_id
     try:
-        resp = requests.post(
+        user[user_id]['resp'] = requests.post(
             'http://158.160.135.104:1234/v1/chat/completions',            #ПОМЕНЯТЬ
             headers={"Content-Type": "application/json"},
 
             json={
                 "messages": [
                     {"role": "system", "content": system_content},
-                    {"role": "user", "content": user[user_name]['user_promt']},
-                    {"role": "assistant", "content": user[user_name]['answer']},
+                    {"role": "user", "content": user[user_id]['user_promt']},
+                    {"role": "assistant", "content": user[user_id]['answer']},
                 ],
                 "temperature": 1,
                 "max_tokens": 2048
             }
         )
-        if resp.status_code == 200 and 'choices' in resp.json():
-            global result
-            result = resp.json()['choices'][0]['message']['content']
+        if user[user_id]['resp'].status_code == 200 and 'choices' in user[user_id]['resp'].json():
+            user[user_id]['result'] = user[user_id]['resp'].json()['choices'][0]['message']['content']
 
         keyboard = types.InlineKeyboardMarkup()
         button_1 = types.InlineKeyboardButton(text='Закончить', callback_data='button1')
         button_2 = types.InlineKeyboardButton(text='Продолжить генерацию', callback_data='button2')
         keyboard.add(button_1, button_2)
-        bot.send_message(call.message.chat.id, text=result, reply_markup=keyboard)
+        bot.send_message(call.message.chat.id, text=user[user_id]['result'], reply_markup=keyboard)
 
         if call.data != 'button2':
-            user[user_name]['user_promt'] = ''
-            user[user_name]['answer'] = ''
+            user[user_id]['user_promt'] = ''
+            user[user_id]['answer'] = ''
             with open('user.json', 'w+') as file:
                 json.dump(user, file)
             bot.register_next_step_handler(call, gpt.solve_task)
         else:
-            user[user_name]['answer'] += result
+            user[user_id]['answer'] += user[user_id]['result']
             return
     except:
         logging.error(
-            f"Не удалось получить изображение робота, код состояния {resp.status_code}"
+            f"Не удалось сгенерировать, код состояния {user[user_id]['resp'].status_code}"
         )
         bot.reply_to(
             call,
-            "Извини, я не смог сгенерировать для тебя изображение робота прямо сейчас.",
+            f"Извини, я не смог сгенерировать для тебя ответ сейчас",
         )
 
 bot.polling()

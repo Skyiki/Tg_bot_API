@@ -1,7 +1,7 @@
 import telebot
 from telebot import types
 import config
-import botik
+import nou
 import json
 
 bot = telebot.TeleBot(token=config.token)
@@ -31,15 +31,22 @@ def help_function(message):
 
 @bot.message_handler(commands=['start'])
 def start_function(message):
-    user_name = message.from_user.first_name
-    if user_name in user:
+    user_name = message.chat.id.first_name
+    user_id = message.chat.id
+    if user_id in user:
         bot.send_message(message.from_user.id, text=f"Приветствую тебя снова, {user_name}!")
         bot.register_next_step_handler(message, solve_task)
+        user[user_id]['user_promt'] = ''
+        user[user_id]['answer'] = ''
+        user[user_id]['result'] = ''
+        user[user_id]['resp'] = ''
     else:
         bot.send_message(message.from_user.id, text=f"Приветствую тебя, {user_name}!")
-        user[user_name] = {}
-        user[user_name]['user_promt'] = ''
-        user[user_name]['answer'] = ''
+        user[user_id] = {}
+        user[user_id]['user_promt'] = ''
+        user[user_id]['answer'] = ''
+        user[user_id]['result'] = ''
+        user[user_id]['resp'] = ''
         with open('user.json', 'w+') as file:
             json.dump(user, file)
         bot.register_next_step_handler(message, solve_task)
@@ -49,6 +56,6 @@ def solve_task(message):
     user_id = message.from_user.id
     bot.send_message(user_id, text="Следующим сообщением напиши вопрос")
     # регистрируем следующий "шаг"
-    bot.register_next_step_handler(user_id, botik.get_promtss)
+    bot.register_next_step_handler(user_id, nou.get_promtss)
 
 bot.polling()
