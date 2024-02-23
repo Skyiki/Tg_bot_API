@@ -1,3 +1,6 @@
+import logging
+
+import requests
 import telebot
 from telebot import types
 import config
@@ -9,6 +12,10 @@ bot = telebot.TeleBot(token=config.token)
 answer = ''
 user = {}
 max_tokens_in_task = 2048
+system_content = 'Ты - дружелюбный помощник! Давай подробный ответ на русском языке.'
+task = ''
+answer = ''
+assistant_content = 'Ответь на вопрос:'
 
 with open('user.json', 'w+') as file:
     json.dump(user, file)
@@ -17,17 +24,6 @@ def count_tokens(text):
     tokenizer = AutoTokenizer.from_pretrained("rhysjones/phi-2-orange")  # название модели
     return len(tokenizer.encode(text))
 
-@bot.message_handler(commands=['debug'])
-def send_logs(message):
-    with open("log_file.txt", "rb") as f:
-        bot.send_document(message.chat.id, f)
-
-
-@bot.message_handler(commands=['about'])
-def about_command(message):
-    user_id = message.chat.id
-    bot.send_message(user_id, text="Рад, что ты заинтересован_а! Мое предназначение — не оставлять тебя в "
-                                   "одиночестве и всячески подбадривать!")
 
 
 @bot.message_handler(commands=['help'])
@@ -86,9 +82,58 @@ def get_promtss(message):
         bot.send_message(chat_id=message.chat.id, text="Сообщение слишком большое! Напиши вопрос короче")
         bot.register_next_step_handler_by_chat_id(message, get_promtss)
         return
-    bot.send_message(chat_id=message.chat.id, text="Промт принят!")
-    bot.register_next_step_handler_by_chat_id(user_id, nou.answer_function)
+    bot.send_message(chat_id=message.chat.id, text="Ожидай ответ!")
+    bot.register_next_step_handler_by_chat_id(user_id, answer_function)
     # дальше идет обработка промта и отправка результата
+
+@bot.message_handler(commands=['answer'])
+def answer_function(call):
+    user_id = call.message_id
+    user_promt = user[user_id]['user_promt']
+    answer = user[user_id]['answer']
+    try:
+        user[user_id]['resp'] = requests.post(
+            'http://158.160.135.104:1234/v1/chat/completions',            #ПОМЕНЯТЬ
+            headers={"Content-Type": "application/json"},
+
+            json={
+                "messages": [
+                    {"role": "system", "content": system_content},
+                    {"role": "user", "content": user_promt},
+                    {"role": "assistant", "content": answer},
+                ],
+                "temperature": 1,
+                "max_tokens": 2048
+            }
+        )
+        if user[user_id]['resp'].status_code == 200 and 'choices' in user[user_id]['resp'].json():
+            user[user_id]['result'] = user[user_id]['resp'].json()['choices'][0]['message']['content']
+
+        keyboard = types.InlineKeyboardMarkup()
+        button_1 = types.InlineKeyboardButton(text='Закончить', callback_data='button1')
+        button_2 = types.InlineKeyboardButton(text='Продолжить генерацию', callback_data='button2')
+        keyboard.add(button_1, button_2)
+        bot.send_message(call.message.chat.id, text=user[user_id]['result'], reply_markup=keyboard)
+
+        if call.data != 'button2':
+            user[user_id]['user_promt'] = ''
+            user[user_id]['answer'] = ''
+            user_promt = ''
+            answer = ''
+            with open('user.json', 'w+') as file:
+                json.dump(user, file)
+            bot.register_next_step_handler(call, solve_task)
+        else:
+            user[user_id]['answer'] += user[user_id]['result']
+            return
+    except:
+        logging.error(
+            f"Не удалось сгенерировать, код состояния {user[user_id]['resp'].status_code}"
+        )
+        bot.reply_to(
+            call,
+            f"Извини, я не смог сгенерировать для тебя ответ сейчас",
+        )
 
 
 bot.polling()
